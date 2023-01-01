@@ -16,7 +16,7 @@ app.get("/", (req, res) => {
   res.send("Rapyd example!");
 });
 
-function createRequest(path, data, method) {
+function makeRequest(path, data, method) {
   const salt = CryptoJS.lib.WordArray.random(12);
   const timestamp = (Math.floor(new Date().getTime() / 1000) - 10).toString();
   let toSign = method + path + salt + timestamp + accessKey + secretKey;
@@ -46,27 +46,17 @@ function createRequest(path, data, method) {
 }
 
 app.post("/add-customer", async (req, res) => {
-  const { email, name } = req.body;
-  const customerData = {
-    email,
-    name,
-  };
-  const createCustomerPath = "/v1/customers";
+  const paymentMethodsEndpoint =
+    "/v1/payment_methods/countries/IN?currency=USD";
   try {
-    const answer = await createRequest(
-      createCustomerPath,
-      customerData,
-      "post"
-    );
-    const customerId = answer.data.data.id;
-    const paymentMethodsEndpoint =
-      "/v1/payment_methods/countries/IN?currency=USD";
-    const methods = await createRequest(paymentMethodsEndpoint, null, "get");
+    const { email, name } = req.body;
+
+    const methods = await makeRequest(paymentMethodsEndpoint, null, "get");
 
     res.send(
       `
       <h1>Select payment method</h1>
-      <form action="/add-method?customer=${customerId}" method="post">
+      <form action="/add-payment-method?email=${email}&name=${name}" method="post">
       <select name="method_type">
     ${methods.data.data.map(
       (item) =>
@@ -77,44 +67,55 @@ app.post("/add-customer", async (req, res) => {
   </form>`
     );
   } catch (e) {
-    console.log(e);
-    res.send("failed");
+    res.send("Something went wrong.");
   }
 });
 
-app.post("/add-method", async (req, res) => {
+app.post("/add-payment-method", async (req, res) => {
   const { method_type } = req.body;
-  const customerId = req.query.customer;
-
-  const customerMethodEndpoint = `/v1/customers/${customerId}/payment_methods`;
-  const methodRequiredFields = await createRequest(
+  const { email, name } = req.query;
+  const methodRequiredFields = await makeRequest(
     `/v1/payment_methods/required_fields/${method_type}`,
     null,
     "get"
   );
-  const addPaymentMethod = await createRequest(
-    customerMethodEndpoint,
-    {
-      customer: customerId,
-      complete_payment_url: `http://localhost:3000/subscribe?customer=${customerId}&method_type=${method_type}`,
-      error_payment_url: "https://google.com/error",
-      fields: methodRequiredFields.data.data.fields,
-      type: method_type,
-    },
-    "post"
+
+  res.send(
+    `
+    <h1>Payment method information</h1>
+    <form action="/subscribe?email=${email}&name=${name}&method_type=${method_type}" method="post">
+  ${methodRequiredFields.data.data.fields
+    .map(
+      (item) =>
+        `<input placeholder="${item.instructions}" name="${item.name}"/>`
+    )
+    .join("<br />")} 
+    <br />
+<button type="submit">Proceed</button>
+</form>`
   );
-  console.log(addPaymentMethod);
-  res.redirect(addPaymentMethod.data.data.redirect_url);
 });
 
 app.post("/subscribe", async (req, res) => {
-  const customerId = req.query.customer;
-  const subscriptionData = {
+  const { email, name, method_type } = req.query;
+  const customerData = {
+    email,
+    name,
+    payment_method: {
+      fields: req.body,
+      type: method_type,
+      complete_payment_url: "https://complete.rapyd.net",
+      error_payment_url: "https://error.rapyd.net",
+    },
+  };
+  const createCustomerPath = "/v1/customers";
+  const answer = await makeRequest(createCustomerPath, customerData, "post");
+  const customerId = answer.data.data.id;
+  const subscriptionPayload = {
     customer: customerId,
-    country: "us",
+    country: "in",
     billing: "pay_automatically",
-    cancel_at_period_end: true,
-    simultaneous_invoice: true,
+    payment_method: answer.data.data.default_payment_method,
     subscription_items: [
       {
         plan: "plan_af8a418da8f6d5b08af5d68e7021105d",
@@ -123,22 +124,19 @@ app.post("/subscribe", async (req, res) => {
     ],
   };
   const checkoutPath = "/v1/checkout/subscription";
-  const subsAnswer = await createRequest(
+  const subsAnswer = await makeRequest(
     checkoutPath,
-    subscriptionData,
+    subscriptionPayload,
     "post"
   );
-  const invoicePath = "/v1/invoices";
-  await createRequest(
-    invoicePath,
-    { customer: customerId, subscription: subsAnswer.id },
-    "post"
-  );
+  const subscriptionData = subsAnswer.data.data;
+  console.log("Sub Answer ", subscriptionData);
+  res.redirect(subscriptionData.redirect_url);
 });
 
 app.get("/payment-methods", async (req, res) => {
   const checkoutPath = "/v1/payment_methods/countries/IN?currency=USD";
-  const methods = await createRequest(checkoutPath, null, "get");
+  const methods = await makeRequest(checkoutPath, null, "get");
   res.send(methods.data.data);
 });
 
@@ -151,7 +149,7 @@ app.get("/create-plan", async (req, res) => {
   };
   const createCustomerPath = "/v1/plans";
 
-  const answer = await createRequest(createCustomerPath, customerData, "post");
+  const answer = await makeRequest(createCustomerPath, customerData, "post");
   res.send(answer.data.data);
 });
 
