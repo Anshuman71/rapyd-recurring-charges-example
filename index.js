@@ -45,15 +45,15 @@ function makeRequest(path, data, method) {
   return axios(request);
 }
 
-app.post("/add-customer", async (req, res) => {
+app.post("/add-customer", async (request, response) => {
   const paymentMethodsEndpoint =
     "/v1/payment_methods/countries/IN?currency=USD";
   try {
-    const { email, name } = req.body;
+    const { email, name } = request.body;
 
     const methods = await makeRequest(paymentMethodsEndpoint, null, "get");
 
-    res.send(
+    response.send(
       `
       <h1>Select payment method</h1>
       <form action="/add-payment-method?email=${email}&name=${name}" method="post">
@@ -67,20 +67,20 @@ app.post("/add-customer", async (req, res) => {
   </form>`
     );
   } catch (e) {
-    res.send("Something went wrong.");
+    response.send("Something went wrong.");
   }
 });
 
-app.post("/add-payment-method", async (req, res) => {
-  const { method_type } = req.body;
-  const { email, name } = req.query;
+app.post("/add-payment-method", async (request, response) => {
+  const { method_type } = request.body;
+  const { email, name } = request.query;
   const methodRequiredFields = await makeRequest(
     `/v1/payment_methods/required_fields/${method_type}`,
     null,
     "get"
   );
 
-  res.send(
+  response.send(
     `
     <h1>Payment method information</h1>
     <form action="/subscribe?email=${email}&name=${name}&method_type=${method_type}" method="post">
@@ -96,13 +96,13 @@ app.post("/add-payment-method", async (req, res) => {
   );
 });
 
-app.post("/subscribe", async (req, res) => {
-  const { email, name, method_type } = req.query;
+app.post("/subscribe", async (request, response) => {
+  const { email, name, method_type } = request.query;
   const customerData = {
     email,
     name,
     payment_method: {
-      fields: req.body,
+      fields: request.body,
       type: method_type,
       complete_payment_url: "https://complete.rapyd.net",
       error_payment_url: "https://error.rapyd.net",
@@ -110,12 +110,13 @@ app.post("/subscribe", async (req, res) => {
   };
   const createCustomerPath = "/v1/customers";
   const answer = await makeRequest(createCustomerPath, customerData, "post");
-  const customerId = answer.data.data.id;
+  const customerProfile = answer.data.data;
+  const customerId = customerProfile.id;
   const subscriptionPayload = {
     customer: customerId,
     country: "in",
     billing: "pay_automatically",
-    payment_method: answer.data.data.default_payment_method,
+    payment_method: customerProfile.default_payment_method,
     subscription_items: [
       {
         plan: "plan_af8a418da8f6d5b08af5d68e7021105d",
@@ -130,8 +131,7 @@ app.post("/subscribe", async (req, res) => {
     "post"
   );
   const subscriptionData = subsAnswer.data.data;
-  console.log("Sub Answer ", subscriptionData);
-  res.redirect(subscriptionData.redirect_url);
+  response.redirect(subscriptionData.redirect_url);
 });
 
 app.listen(port, () => {
