@@ -134,50 +134,6 @@ app.post("/subscribe", async (req, res) => {
   res.redirect(subscriptionData.redirect_url);
 });
 
-app.get("/payment-methods", async (req, res) => {
-  const checkoutPath = "/v1/payment_methods/countries/IN?currency=USD";
-  const methods = await makeRequest(checkoutPath, null, "get");
-  res.send(methods.data.data);
-});
-
-app.get("/create-plan", async (req, res) => {
-  const customerData = {
-    currency: "USD",
-    interval: "month",
-    amount: 100,
-    product: "product_cc6ee8ad8b44b2e4bc12521453ecc874",
-  };
-  const createCustomerPath = "/v1/plans";
-
-  const answer = await makeRequest(createCustomerPath, customerData, "post");
-  res.send(answer.data.data);
-});
-
 app.listen(port, () => {
   console.log(`Rapyd app listening on port ${port}`);
 });
-
-// {
-//     "id": "product_cc6ee8ad8b44b2e4bc12521453ecc874",
-//     "active": true,
-//     "attributes": [],
-//     "created_at": 1672387959,
-//     "description": "",
-//     "images": [],
-//     "metadata": {},
-//     "name": "Monthly parking",
-//     "package_dimensions": {
-//     "height": 0,
-//     "length": 0,
-//     "weight": 0,
-//     "width": 0
-//     },
-//     "shippable": false,
-//     "skus": [],
-//     "statement_descriptor": "",
-//     "type": "services",
-//     "unit_label": "",
-//     "updated_at": 1672387959
-//     }
-
-// plan_d51d8340199d93faaaa105642fc87d7d
