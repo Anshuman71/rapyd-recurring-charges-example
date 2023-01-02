@@ -28,6 +28,12 @@ SECRET_KEY=<copied-value>
 
 Run `npm run dev` at the project root to start the server and open `http://localhost:3000` in a web browser.
 
+### Solution overview
+
+Before starting the server implementation, it's essential to understand the solution and go through the architecture. The below diagram explains how the user, your Nodejs application, and Rapyd Collect API communicate together.
+
+![Archecture diagram](https://i.imgur.com/VbwKue1.png)
+
 ## Get Support
 
 - https://community.rapyd.net
